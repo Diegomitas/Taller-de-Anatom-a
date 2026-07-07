@@ -1,0 +1,322 @@
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taller de Anatomía: Duelo contra Jasper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --fondo: #DCC7AA;      /* Beige medio */
+            --tarjeta: #C9B9A5;    /* Beige oscuro */
+            --texto: #4E342E;      /* Café oscuro */
+            --boton: #3E2723;      /* Café profundo */
+            --acento: #A1887F;     /* Café claro */
+            --texto-claro: #D7CCC8;/* Beige muy claro */
+        }
+        body { 
+            background-color: var(--fondo);
+            color: var(--texto);
+            font-family: 'Georgia', serif;
+        }
+        
+        @keyframes floating {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-15px); }
+            100% { transform: translateY(0px); }
+        }
+        
+        #app { 
+            background-color: var(--tarjeta); 
+            animation: floating 4s ease-in-out infinite;
+        }
+        
+        .btn-avatar { cursor: pointer; transition: all 0.2s; }
+        .btn-avatar:hover { background-color: var(--acento); }
+        .selected-avatar { border: 3px solid var(--boton); background-color: var(--acento); }
+        
+        .btn-start {
+            background-color: var(--boton);
+            color: var(--texto-claro);
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            font-weight: bold;
+            transition: opacity 0.3s;
+            cursor: pointer;
+        }
+        .btn-start:hover { opacity: 0.9; }
+        
+        .maze-cell { width: 40px; height: 40px; border: 1px solid var(--texto); display: flex; align-items: center; justify-content: center; }
+        .wall { background-color: var(--boton); }
+        .path { background-color: var(--tarjeta); }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div id="app" class="w-full max-w-2xl rounded-xl shadow-2xl p-8 border-2 border-[#5D4037]">
+        
+        <div id="welcome-screen" class="text-center space-y-6">
+            <h1 class="text-4xl font-bold border-b-2 border-[#5D4037] pb-4">Taller de Anatomía</h1>
+            <p class="text-lg">Prepárate. Tienes un duelo contra Jasper, el maestro de las proporciones.</p>
+            
+            <div class="text-left text-[#5D4037] bg-[#BCAAA4] p-4 rounded-lg border border-[#5D4037] space-y-2">
+                <h3 class="font-bold border-b border-[#5D4037] pb-1">¿De qué trata este duelo?</h3>
+                <p class="text-sm">Si fallas una respuesta, Jasper te retará a salir de un laberinto en 6 segundos. Si ganas, salvas tu vida.</p>
+            </div>
+            
+            <input type="text" id="username" placeholder="Tu nombre..." 
+                   class="w-full p-4 border-2 border-[#5D4037] rounded-lg bg-[#C9B9A5] placeholder-[#5D4037] outline-none">
+            
+            <div class="py-2">
+                <p class="mb-2 text-sm font-bold">Elige tu avatar:</p>
+                <div id="avatar-container" class="flex justify-center gap-4">
+                    <button class="btn-avatar p-3 rounded-full text-2xl border-2 border-transparent" onclick="selectAvatar(this, '🦊')">🦊</button>
+                    <button class="btn-avatar p-3 rounded-full text-2xl border-2 border-transparent" onclick="selectAvatar(this, '🐻')">🐻</button>
+                    <button class="btn-avatar p-3 rounded-full text-2xl border-2 border-transparent" onclick="selectAvatar(this, '🦉')">🦉</button>
+                    <button class="btn-avatar p-3 rounded-full text-2xl border-2 border-transparent" onclick="selectAvatar(this, '🐰')">🐰</button>
+                </div>
+            </div>
+            
+            <p id="error-msg" class="text-[#5D4037] font-bold text-sm hidden">Necesitas un nombre y un avatar para comenzar.</p>
+            
+            <button onclick="startGame()" class="btn-start w-full">Comenzar Duelo</button>
+        </div>
+
+        <div id="game-screen" class="hidden space-y-6">
+            <div class="flex justify-between items-center text-sm font-bold">
+                <div class="flex items-center gap-2">
+                    <span id="display-avatar" class="text-2xl"></span>
+                    <span id="display-name"></span>
+                    <div id="trophy-container" class="flex gap-1 ml-2"></div>
+                </div>
+                <span id="lives-counter">Vidas: ❤️❤️❤️</span>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-[#BCAAA4] p-3 rounded-lg border border-[#5D4037] text-center">
+                    <p class="text-xs mb-1" id="label-username"></p>
+                    <span class="text-xl font-bold" id="user-score">0</span>
+                </div>
+                <div class="bg-[#BCAAA4] p-3 rounded-lg border border-[#5D4037] text-center">
+                    <p class="text-xs mb-1">Jasper 👨‍🎨</p>
+                    <span class="text-xl font-bold" id="rival-score">0</span>
+                </div>
+            </div>
+
+            <h2 id="question-text" class="text-2xl font-bold"></h2>
+            <div id="options-container" class="grid grid-cols-1 gap-4"></div>
+        </div>
+
+        <div id="minigame-screen" class="hidden text-center space-y-6">
+            <h2 class="text-2xl font-bold text-[#5D4037]">¡Reto de Jasper: Laberinto!</h2>
+            <p class="text-sm">¡Respuesta incorrecta! Tienes 6 segundos para llegar a la meta 🏁.</p>
+            <div id="maze-timer" class="text-3xl font-bold text-red-700">06</div>
+            <div id="maze-status" class="text-sm font-bold h-6 text-[#5D4037]"></div>
+            <div id="maze-board" class="flex flex-col items-center gap-1 mx-auto"></div>
+        </div>
+
+        <div id="result-screen" class="hidden text-center space-y-6">
+            <h2 id="final-status" class="text-3xl font-bold"></h2>
+            <p id="final-score" class="text-lg"></p>
+            <button onclick="location.reload()" class="btn-start w-full">Reiniciar Duelo</button>
+        </div>
+    </div>
+
+    <script>
+        const questions = [
+            { q: "¿Cuántos ojos caben en el ancho de una cabeza ideal?", options: ["Tres", "Cinco", "Seis"], correct: 1 },
+            { q: "¿Dónde comienza la línea de la oreja?", options: ["Línea de los ojos", "Línea de la nariz", "Línea de la boca"], correct: 0 },
+            { q: "¿Qué línea divide el rostro en la 'Regla de los Tercios'?", options: ["La línea de los labios", "La línea de las cejas", "La línea del mentón"], correct: 1 },
+            { q: "¿Cuál es el ancho de la nariz en una vista frontal?", options: ["Distancia entre ojos", "Ancho de la boca", "Ancho de un ojo"], correct: 2 },
+            { q: "¿Dónde terminan los labios usualmente?", options: ["Centro de los ojos", "Borde externo de la nariz", "Debajo de la barbilla"], correct: 0 }
+        ];
+
+        const mazes = [
+            [[0, 1, 0, 0, 0], [0, 1, 0, 1, 0], [0, 0, 0, 1, 0], [1, 1, 0, 1, 0], [0, 0, 0, 0, 2]],
+            [[0, 0, 0, 1, 0], [1, 1, 0, 1, 0], [0, 0, 0, 0, 0], [0, 1, 1, 1, 1], [0, 0, 0, 0, 2]],
+            [[0, 0, 1, 0, 0], [1, 0, 1, 0, 1], [0, 0, 0, 0, 0], [0, 1, 1, 0, 1], [2, 0, 0, 0, 0]],
+            [[0, 1, 0, 0, 0], [0, 1, 0, 1, 0], [0, 0, 0, 0, 0], [1, 0, 1, 1, 1], [0, 0, 0, 0, 2]],
+            [[0, 0, 0, 0, 0], [1, 1, 1, 1, 0], [0, 0, 0, 0, 0], [0, 1, 1, 1, 1], [2, 0, 0, 0, 0]],
+            [[0, 1, 1, 1, 0], [0, 0, 0, 1, 0], [1, 1, 0, 1, 0], [0, 0, 0, 0, 0], [0, 1, 1, 1, 2]],
+            [[0, 0, 0, 0, 0], [0, 1, 1, 1, 0], [0, 0, 0, 1, 0], [1, 1, 0, 0, 0], [0, 0, 0, 1, 2]],
+            [[0, 1, 0, 0, 0], [0, 1, 0, 1, 1], [0, 0, 0, 0, 0], [1, 1, 1, 0, 1], [0, 0, 0, 0, 2]],
+            [[0, 0, 1, 0, 0], [0, 1, 1, 0, 0], [0, 0, 0, 0, 1], [1, 1, 1, 0, 0], [2, 0, 0, 0, 0]],
+            [[0, 1, 0, 0, 0], [0, 1, 0, 1, 0], [0, 0, 0, 0, 0], [0, 1, 1, 1, 1], [2, 0, 0, 0, 0]]
+        ];
+
+        let state = { username: "", avatar: "", currentQ: 0, score: 0, rivalScore: 0, lives: 3, playerPos: {x: 0, y: 0}, mazeIndex: 0, mazeInterval: null, timeLeft: 6 };
+        
+        document.addEventListener('keydown', (e) => {
+            if (document.getElementById('minigame-screen').classList.contains('hidden')) return;
+            let {x, y} = state.playerPos;
+            if (e.key === "ArrowUp") y = Math.max(0, y - 1);
+            if (e.key === "ArrowDown") y = Math.min(4, y + 1);
+            if (e.key === "ArrowLeft") x = Math.max(0, x - 1);
+            if (e.key === "ArrowRight") x = Math.min(4, x + 1);
+            
+            const currentMaze = mazes[state.mazeIndex];
+            if (currentMaze[y] && currentMaze[y][x] !== 1) {
+                processMove(x, y);
+            }
+        });
+
+        function selectAvatar(el, icon) {
+            state.avatar = icon;
+            document.querySelectorAll('.btn-avatar').forEach(b => b.classList.remove('selected-avatar'));
+            el.classList.add('selected-avatar');
+            document.getElementById('error-msg').classList.add('hidden');
+        }
+
+        function startGame() {
+            const nameInput = document.getElementById('username').value;
+            if(!nameInput || !state.avatar) {
+                document.getElementById('error-msg').classList.remove('hidden');
+                return;
+            }
+            state.username = nameInput;
+            document.getElementById('welcome-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            
+            document.getElementById('display-name').innerText = state.username;
+            document.getElementById('label-username').innerText = state.username;
+            document.getElementById('display-avatar').innerText = state.avatar;
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            if(state.currentQ >= questions.length || state.lives <= 0) return showResults();
+            
+            const q = questions[state.currentQ];
+            document.getElementById('question-text').innerText = q.q;
+            
+            const container = document.getElementById('options-container');
+            container.innerHTML = '';
+            
+            q.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full p-4 text-left border-2 border-[#5D4037] rounded-lg bg-[#C9B9A5] hover:bg-[#A1887F] font-medium transition-colors";
+                btn.innerText = opt;
+                btn.onclick = () => checkAnswer(idx);
+                container.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(idx) {
+            if(Math.random() > 0.4) state.rivalScore++;
+            
+            if(idx === questions[state.currentQ].correct) {
+                state.score++;
+                addTrophy();
+                state.currentQ++;
+                document.getElementById('user-score').innerText = state.score;
+                document.getElementById('rival-score').innerText = state.rivalScore;
+                loadQuestion();
+            } else {
+                showMinigame();
+            }
+        }
+
+        function showMinigame() {
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('minigame-screen').classList.remove('hidden');
+            state.playerPos = {x: 0, y: 0};
+            state.mazeIndex = Math.floor(Math.random() * mazes.length);
+            
+            state.timeLeft = 6;
+            document.getElementById('maze-timer').innerText = "06";
+            document.getElementById('maze-status').innerText = "";
+            
+            state.mazeInterval = setInterval(() => {
+                state.timeLeft--;
+                document.getElementById('maze-timer').innerText = state.timeLeft < 10 ? "0" + state.timeLeft : state.timeLeft;
+                if(state.timeLeft <= 0) {
+                    clearInterval(state.mazeInterval);
+                    handleMazeFailure();
+                }
+            }, 1000);
+            
+            renderMaze();
+        }
+
+        function handleMazeFailure() {
+            state.lives--;
+            updateLives();
+            document.getElementById('minigame-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            if(state.lives > 0) {
+                state.currentQ++;
+                loadQuestion();
+            } else {
+                showResults();
+            }
+        }
+
+        function renderMaze() {
+            const board = document.getElementById('maze-board');
+            board.innerHTML = '';
+            const currentMaze = mazes[state.mazeIndex];
+            
+            for(let y=0; y<currentMaze.length; y++) {
+                const row = document.createElement('div');
+                row.className = "flex";
+                for(let x=0; x<currentMaze[y].length; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = `maze-cell ${currentMaze[y][x] === 1 ? 'wall' : 'path'}`;
+                    if(state.playerPos.x === x && state.playerPos.y === y) cell.innerText = state.avatar;
+                    else if(currentMaze[y][x] === 2) cell.innerText = "🏁";
+                    
+                    row.appendChild(cell);
+                }
+                board.appendChild(row);
+            }
+        }
+
+        function processMove(x, y) {
+            state.playerPos = {x, y};
+            const currentMaze = mazes[state.mazeIndex];
+            if(currentMaze[y][x] === 2) {
+                clearInterval(state.mazeInterval);
+                document.getElementById('maze-status').innerText = "¡Has salido! Conservas tu vida.";
+                setTimeout(() => {
+                    state.currentQ++;
+                    document.getElementById('minigame-screen').classList.add('hidden');
+                    document.getElementById('game-screen').classList.remove('hidden');
+                    loadQuestion();
+                }, 1000);
+            } else {
+                renderMaze();
+            }
+        }
+
+        function addTrophy() {
+            const container = document.getElementById('trophy-container');
+            const trophy = document.createElement('span');
+            trophy.innerText = "🏆";
+            container.appendChild(trophy);
+        }
+
+        function updateLives() {
+            let hearts = "";
+            for(let i=0; i<state.lives; i++) hearts += "❤️";
+            document.getElementById('lives-counter').innerText = `Vidas: ${hearts}`;
+        }
+
+        function showResults() {
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.remove('hidden');
+            
+            const hasLost = state.lives <= 0 || state.score < state.rivalScore;
+            if (hasLost) {
+                document.getElementById('final-status').innerText = "Has perdido el duelo";
+                document.getElementById('final-score').innerText = "Las proporciones no mienten. Te falta disciplina. Tu trazo es débil. ¿Te atreves a intentarlo de nuevo?";
+            } else {
+                document.getElementById('final-status').innerText = "¡Victoria absoluta!";
+                document.getElementById('final-score').innerText = "Dominas la anatomía. Has superado mis expectativas con total precisión. ¡Felicidades, artista!";
+            }
+        }
+    </script>
+</body>
+</html>
+
+```
